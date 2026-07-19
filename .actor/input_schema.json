@@ -79,12 +79,8 @@
       "description": "Use Apify Proxy for reliable Trustpilot extraction. Residential proxies are recommended for larger runs.",
       "editor": "proxy",
       "default": {
-        "useApifyProxy": true,
-        "apifyProxyGroups": [
-          "RESIDENTIAL"
-        ],
-        "countryCode": "US"
-      }
+        "useApifyProxy": false
+      }  
     }
   },
   "required": [],

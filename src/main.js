@@ -168,7 +168,7 @@ async function run() {
                 }
 
                 const reviewPageUrl = getReviewPageUrl(startUrl, pageNum, options);
-                log.info(`Fetching page ${pageNum}: ${reviewPageUrl}`);
+                log.info(`Fetching page ${pageNum}`);
 
                 const maxRetries = 6;
                 let pageData = null;
