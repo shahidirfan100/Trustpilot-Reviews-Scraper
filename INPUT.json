@@ -1,0 +1,16 @@
+{
+  "urls": [
+    "https://www.trustpilot.com/review/apify.com"
+  ],
+  "results_wanted": 20,
+  "max_pages": 2,
+  "sort": "recency",
+  "languages": "all",
+  "proxyConfiguration": {
+    "useApifyProxy": true,
+    "apifyProxyGroups": [
+      "RESIDENTIAL"
+    ],
+    "countryCode": "US"
+  }
+}

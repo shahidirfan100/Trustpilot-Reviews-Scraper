@@ -1,0 +1,78 @@
+{
+  "actorSpecification": 1,
+  "fields": {},
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "business_name",
+          "business_domain",
+          "rating",
+          "title",
+          "text",
+          "reviewer_name",
+          "reviewer_country",
+          "is_verified",
+          "published_date",
+          "experience_date",
+          "company_reply_text",
+          "source_url"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "business_name": {
+            "label": "Business",
+            "format": "text"
+          },
+          "business_domain": {
+            "label": "Domain",
+            "format": "text"
+          },
+          "rating": {
+            "label": "Rating",
+            "format": "number"
+          },
+          "title": {
+            "label": "Title",
+            "format": "text"
+          },
+          "text": {
+            "label": "Text",
+            "format": "text"
+          },
+          "reviewer_name": {
+            "label": "Reviewer",
+            "format": "text"
+          },
+          "reviewer_country": {
+            "label": "Country",
+            "format": "text"
+          },
+          "is_verified": {
+            "label": "Verified",
+            "format": "boolean"
+          },
+          "published_date": {
+            "label": "Published",
+            "format": "date"
+          },
+          "experience_date": {
+            "label": "Experience",
+            "format": "date"
+          },
+          "company_reply_text": {
+            "label": "Company Reply",
+            "format": "text"
+          },
+          "source_url": {
+            "label": "Source",
+            "format": "link"
+          }
+        }
+      }
+    }
+  }
+}

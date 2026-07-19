@@ -1,0 +1,92 @@
+{
+  "title": "Trustpilot Reviews Scraper",
+  "description": "Extract reviews from Trustpilot company review pages. Add one or more Trustpilot review URLs or company domains.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "urls": {
+      "title": "Trustpilot URL or company domain",
+      "type": "array",
+      "description": "Trustpilot company review URLs or plain company domains. Examples: https://www.trustpilot.com/review/apify.com or apify.com.",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      },
+      "prefill": [
+        "https://www.trustpilot.com/review/apify.com"
+      ]
+    },
+    "results_wanted": {
+      "title": "Reviews wanted",
+      "type": "integer",
+      "description": "Maximum number of reviews to save across all URLs.",
+      "minimum": 1,
+      "default": 20,
+      "prefill": 20,
+      "editor": "number"
+    },
+    "max_pages": {
+      "title": "Maximum pages",
+      "type": "integer",
+      "description": "Maximum review pages to request per company.",
+      "minimum": 1,
+      "default": 10,
+      "prefill": 2,
+      "editor": "number"
+    },
+    "sort": {
+      "title": "Sort order",
+      "type": "string",
+      "description": "Trustpilot review sort order.",
+      "default": "recency",
+      "prefill": "recency",
+      "editor": "select",
+      "enum": [
+        "recency",
+        "relevance"
+      ],
+      "enumTitles": [
+        "Most recent",
+        "Most relevant"
+      ]
+    },
+    "languages": {
+      "title": "Languages",
+      "type": "string",
+      "description": "Use all languages or a Trustpilot language code such as en, de, fr, es, or it.",
+      "default": "all",
+      "prefill": "all",
+      "editor": "textfield"
+    },
+    "stars": {
+      "title": "Star rating filter",
+      "type": "integer",
+      "description": "Optional star rating filter from 1 to 5.",
+      "minimum": 1,
+      "maximum": 5,
+      "editor": "number"
+    },
+    "verified": {
+      "title": "Verified reviews only",
+      "type": "boolean",
+      "description": "Return only verified reviews when enabled.",
+      "default": false,
+      "editor": "checkbox"
+    },
+    "proxyConfiguration": {
+      "title": "Proxy configuration",
+      "type": "object",
+      "description": "Use Apify Proxy for reliable Trustpilot extraction. Residential proxies are recommended for larger runs.",
+      "editor": "proxy",
+      "default": {
+        "useApifyProxy": true,
+        "apifyProxyGroups": [
+          "RESIDENTIAL"
+        ],
+        "countryCode": "US"
+      }
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
