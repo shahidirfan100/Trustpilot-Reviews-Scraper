@@ -147,6 +147,7 @@ async function createPage(browser, proxyConf, sessionId) {
         locale: 'en-US',
         ...(proxyUrl ? { proxy: await parseProxyUrl(proxyUrl) } : {}),
     });
+
     const page = await context.newPage();
 
     await page.route('**/*', (route) => {
@@ -166,7 +167,18 @@ async function extractPageData(page, reviewPageUrl) {
     await page.goto(reviewPageUrl, { waitUntil: 'domcontentloaded', timeout: PAGE_NAVIGATION_TIMEOUT_MS });
     await page.waitForSelector('#__NEXT_DATA__', { state: 'attached', timeout: NEXT_DATA_TIMEOUT_MS });
     const raw = await parseNextDataPayload(page);
-    return raw?.props?.pageProps || null;
+    const pageProps = raw?.props?.pageProps || null;
+    const currentUrl = page.url();
+
+    if (raw?.page === '/users/connect' || currentUrl.includes('/users/connect')) {
+        return {
+            loginRequired: true,
+            currentUrl,
+            redirectUrl: pageProps?.redirectUrl,
+        };
+    }
+
+    return pageProps;
 }
 
 async function run() {
@@ -194,6 +206,7 @@ async function run() {
     let totalSaved = 0;
     let totalPagesProcessed = 0;
     let browser = null;
+    let stopReason = 'completed';
 
     try {
         browser = await firefox.launch({ headless: true });
@@ -216,6 +229,7 @@ async function run() {
                     for (let retry = 0; retry < maxRetries && !pageData; retry++) {
                         try {
                             pageData = await extractPageData(page, reviewPageUrl);
+                            if (pageData?.loginRequired) break;
                             if (!pageData?.reviews?.length) pageData = null;
                         } catch (error) {
                             if (retry + 1 < maxRetries) {
@@ -227,6 +241,12 @@ async function run() {
                     }
 
                     totalPagesProcessed++;
+                    if (pageData?.loginRequired) {
+                        stopReason = 'trustpilot_login_page';
+                        log.info(`Trustpilot login page arrived at page ${pageNum}. Trustpilot stopped anonymous review access, so the actor completed with ${totalSaved} saved reviews.`);
+                        break;
+                    }
+
                     if (!pageData) {
                         log.warning(`Page ${pageNum} failed after ${maxRetries} retries.`);
                         if (pageNum === 1) break;
@@ -262,7 +282,7 @@ async function run() {
         if (browser) await browser.close().catch(() => {});
     }
 
-    log.info(`Done | saved=${totalSaved} | pages=${totalPagesProcessed}`);
+    log.info(`Done | saved=${totalSaved} | pages=${totalPagesProcessed} | stop_reason=${stopReason}`);
 }
 
 async function parseProxyUrl(proxyUrl) {
