@@ -3,7 +3,9 @@ import { existsSync, readFileSync } from 'fs';
 import { firefox } from 'playwright';
 
 const MAX_PAGES = 50;
-const PAGE_TIMEOUT_SEC = 120;
+const REVIEWS_PER_PAGE = 20;
+const PAGE_NAVIGATION_TIMEOUT_MS = 45000;
+const NEXT_DATA_TIMEOUT_MS = 20000;
 
 await Actor.init();
 
@@ -37,7 +39,10 @@ function readLocalInputFile() {
 }
 
 function getReviewPageUrl(baseUrl, page, options) {
-    const url = new URL(baseUrl);
+    const normalizedUrl = /^https?:\/\//i.test(baseUrl)
+        ? baseUrl
+        : `https://www.trustpilot.com/review/${baseUrl}`;
+    const url = new URL(normalizedUrl);
     url.searchParams.set('page', String(page));
     if (options.sort) url.searchParams.set('sort', options.sort);
     if (options.languages && options.languages !== 'all') url.searchParams.set('languages', options.languages);
@@ -47,7 +52,10 @@ function getReviewPageUrl(baseUrl, page, options) {
 }
 
 function extractBusinessDomain(reviewPageUrl) {
-    const pathParts = new URL(reviewPageUrl).pathname.split('/').filter(Boolean);
+    const normalizedUrl = /^https?:\/\//i.test(reviewPageUrl)
+        ? reviewPageUrl
+        : `https://www.trustpilot.com/review/${reviewPageUrl}`;
+    const pathParts = new URL(normalizedUrl).pathname.split('/').filter(Boolean);
     return pathParts[pathParts.length - 1];
 }
 
@@ -127,10 +135,44 @@ function parseInput(raw) {
     return raw;
 }
 
+function getMaxPages(input, resultsWanted) {
+    const requestedPages = parsePositiveInteger(input.max_pages, 0);
+    const neededPages = Math.ceil(resultsWanted / REVIEWS_PER_PAGE) || 1;
+    return Math.min(requestedPages || neededPages, MAX_PAGES);
+}
+
+async function createPage(browser, proxyConf, sessionId) {
+    const proxyUrl = proxyConf ? await proxyConf.newUrl(sessionId) : undefined;
+    const context = await browser.newContext({
+        locale: 'en-US',
+        ...(proxyUrl ? { proxy: await parseProxyUrl(proxyUrl) } : {}),
+    });
+    const page = await context.newPage();
+
+    await page.route('**/*', (route) => {
+        const request = route.request();
+        const resourceType = request.resourceType();
+        const url = request.url();
+
+        if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) return route.abort();
+        if (/google-analytics|googletagmanager|facebook|doubleclick|adsense|hotjar|sentry|newrelic/i.test(url)) return route.abort();
+        return route.continue();
+    });
+
+    return { context, page };
+}
+
+async function extractPageData(page, reviewPageUrl) {
+    await page.goto(reviewPageUrl, { waitUntil: 'domcontentloaded', timeout: PAGE_NAVIGATION_TIMEOUT_MS });
+    await page.waitForSelector('#__NEXT_DATA__', { state: 'attached', timeout: NEXT_DATA_TIMEOUT_MS });
+    const raw = await parseNextDataPayload(page);
+    return raw?.props?.pageProps || null;
+}
+
 async function run() {
     const input = { ...parseInput(readLocalInputFile()), ...parseInput(await Actor.getInput()) };
     const resultsWanted = parsePositiveInteger(input.results_wanted ?? input.maxReviews, 20);
-    const maxPages = Math.min(parsePositiveInteger(input.max_pages, 10), MAX_PAGES);
+    const maxPages = getMaxPages(input, resultsWanted);
     const urls = toArray(input.urls);
     const startUrls = urls.length ? [...new Set(urls)] : ['https://www.trustpilot.com/review/apify.com'];
     const options = {
@@ -156,80 +198,64 @@ async function run() {
     try {
         browser = await firefox.launch({ headless: true });
 
-        const pageStartTime = Date.now();
         for (const startUrl of startUrls) {
             const businessDomain = extractBusinessDomain(startUrl);
+            let context = null;
+            let page = null;
 
-            for (let pageNum = 1; pageNum <= maxPages && totalSaved < resultsWanted; pageNum++) {
-                const elapsedSec = (Date.now() - pageStartTime) / 1000;
-                if (elapsedSec > PAGE_TIMEOUT_SEC && totalSaved > 0) {
-                    log.info(`Reached ${PAGE_TIMEOUT_SEC}s limit. Stopping.`);
-                    break;
-                }
+            try {
+                ({ context, page } = await createPage(browser, proxyConf, `tp-${Date.now()}-${businessDomain}`));
 
-                const reviewPageUrl = getReviewPageUrl(startUrl, pageNum, options);
-                log.info(`Fetching page ${pageNum}`);
+                for (let pageNum = 1; pageNum <= maxPages && totalSaved < resultsWanted; pageNum++) {
+                    const reviewPageUrl = getReviewPageUrl(startUrl, pageNum, options);
+                    log.info(`Fetching page ${pageNum}`);
 
-                const maxRetries = 6;
-                let pageData = null;
-                let businessUnit = {};
+                    const maxRetries = 3;
+                    let pageData = null;
 
-                for (let retry = 0; retry < maxRetries && !pageData; retry++) {
-                    let ctx = null;
-                    try {
-                        const sessionId = `tp-${Date.now()}-${pageNum}-${retry}`;
-                        const proxyUrl = proxyConf ? await proxyConf.newUrl(sessionId) : undefined;
-                        ctx = await browser.newContext({
-                            locale: 'en-US',
-                            ...(proxyUrl ? { proxy: await parseProxyUrl(proxyUrl) } : {}),
-                        });
-                        const p = await ctx.newPage();
-                        await p.route('**/*', (r) => {
-                            const url = r.request().url();
-                            if (/google-analytics|googletagmanager|facebook|doubleclick|adsense|hotjar|sentry|newrelic|doubleclick/i.test(url)) return r.abort();
-                            return r.continue();
-                        });
-                        await p.goto(reviewPageUrl, { waitUntil: 'load', timeout: 60000 });
-                        await p.waitForTimeout(3000);
-                        await p.waitForSelector('#__NEXT_DATA__', { state: 'attached', timeout: 45000 }).catch(() => {});
-                        const raw = await parseNextDataPayload(p);
-                        if (raw?.props?.pageProps?.reviews?.length) {
-                            pageData = raw.props.pageProps;
-                            businessUnit = pageData.businessUnit || {};
+                    for (let retry = 0; retry < maxRetries && !pageData; retry++) {
+                        try {
+                            pageData = await extractPageData(page, reviewPageUrl);
+                            if (!pageData?.reviews?.length) pageData = null;
+                        } catch (error) {
+                            if (retry + 1 < maxRetries) {
+                                log.warning(`Page ${pageNum} retry ${retry + 1}/${maxRetries}: ${error.message}`);
+                                if (context) await context.close().catch(() => {});
+                                ({ context, page } = await createPage(browser, proxyConf, `tp-${Date.now()}-${businessDomain}-${pageNum}-${retry}`));
+                            }
                         }
-                    } catch {
-                        // continue to next retry
-                    } finally {
-                        if (ctx) await ctx.close().catch(() => {});
                     }
-                }
 
-                totalPagesProcessed++;
-                if (!pageData) {
-                    log.warning(`Page ${pageNum} failed after ${maxRetries} retries.`);
-                    if (pageNum === 1) break;
-                    continue;
-                }
+                    totalPagesProcessed++;
+                    if (!pageData) {
+                        log.warning(`Page ${pageNum} failed after ${maxRetries} retries.`);
+                        if (pageNum === 1) break;
+                        continue;
+                    }
 
-                const reviews = pageData.reviews || [];
-                const batch = [];
-                for (const review of reviews) {
-                    if (totalSaved + batch.length >= resultsWanted) break;
-                    if (seenReviewIds.has(review.id)) continue;
-                    seenReviewIds.add(review.id);
-                    batch.push(mapReview(review, businessUnit, {
-                        url: reviewPageUrl, page: pageNum, businessDomain,
-                    }));
-                }
+                    const reviews = pageData.reviews || [];
+                    const businessUnit = pageData.businessUnit || {};
+                    const batch = [];
+                    for (const review of reviews) {
+                        if (totalSaved + batch.length >= resultsWanted) break;
+                        if (seenReviewIds.has(review.id)) continue;
+                        seenReviewIds.add(review.id);
+                        batch.push(mapReview(review, businessUnit, {
+                            url: reviewPageUrl, page: pageNum, businessDomain,
+                        }));
+                    }
 
-                if (batch.length) {
-                    await Actor.pushData(batch);
-                    totalSaved += batch.length;
-                    log.info(`Saved ${batch.length} reviews. Total: ${totalSaved}/${resultsWanted}`);
-                }
+                    if (batch.length) {
+                        await Actor.pushData(batch);
+                        totalSaved += batch.length;
+                        log.info(`Saved ${batch.length} reviews. Total: ${totalSaved}/${resultsWanted}`);
+                    }
 
-                if (shouldStopCrawling(pageData, pageNum, maxPages)) break;
-                if (reviews.length < 20) break;
+                    if (shouldStopCrawling(pageData, pageNum, maxPages)) break;
+                    if (reviews.length < REVIEWS_PER_PAGE) break;
+                }
+            } finally {
+                if (context) await context.close().catch(() => {});
             }
         }
     } finally {

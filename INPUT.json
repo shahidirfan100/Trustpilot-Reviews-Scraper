@@ -7,10 +7,6 @@
   "sort": "recency",
   "languages": "all",
   "proxyConfiguration": {
-    "useApifyProxy": true,
-    "apifyProxyGroups": [
-      "RESIDENTIAL"
-    ],
-    "countryCode": "US"
+    "useApifyProxy": false
   }
 }
