@@ -1,37 +1,38 @@
-# Trustpilot Reviews Scraper
+## What does Trustpilot Reviews Scraper do?
 
-Extract Trustpilot reviews from public company review pages. Collect review text, star ratings, dates, reviewer details, verification signals, business TrustScore, and company replies for reputation monitoring, competitor research, and customer feedback analysis.
+Trustpilot Reviews Scraper collects public reviews, ratings, reviewer profiles, and company metadata from Trustpilot company pages. Add one or more Trustpilot review URLs or plain company domains, and the actor returns structured datasets with review text, star ratings, published dates, verification signals, business TrustScore, and company replies. It is designed for reputation monitoring, competitor research, customer feedback analysis, and data enrichment workflows that need Trustpilot data without manual copy-paste.
 
-## Features
+Trustpilot does not provide a public API for review extraction at scale. This actor works with the public Trustpilot website to help you collect the data you need.
 
-- **Multiple URL input** - Add one or many Trustpilot review URLs or plain company domains.
-- **Review pagination** - Collect reviews across pages until your result or page limit is reached.
-- **Rating filters** - Focus on one star level when you need sentiment-specific datasets.
-- **Language filters** - Collect all languages or target a specific Trustpilot language code.
-- **Clean output** - Empty and unavailable values are removed before records are saved.
-- **Business context** - Include company name, domain, TrustScore, and review counts when available.
+## Why use Trustpilot Reviews Scraper?
 
----
+- **Reliable dataset creation** - Collect structured Trustpilot reviews with titles, ratings, text, dates, reviewer details, and company context without manual copying.
+- **Automation-ready output** - Export results to JSON, CSV, Excel, XML, or connect to Google Sheets, webhooks, Make, and Zapier.
+- **Use-case fit** - Supports reputation monitoring, competitor benchmarking, customer experience analysis, response tracking, and AI or RAG data collection.
 
-## Use Cases
+## What data can you extract from Trustpilot?
 
-### Reputation Monitoring
+| Field | Description |
+|-------|-------------|
+| `title` | Review title |
+| `text` | Full review text |
+| `rating` | Star rating from 1 to 5 |
+| `published_date` | Date when the review was published |
+| `is_verified` | Whether Trustpilot marks the review as verified |
+| `reviewer_name` | Public reviewer display name |
+| `reviewer_country` | Reviewer country code when available |
+| `business_name` | Company display name on Trustpilot |
+| `business_trust_score` | Business TrustScore when available |
+| `company_reply_text` | Public company reply text when available |
 
-Track recent customer feedback for your own brand. Use ratings, review text, dates, and replies to spot changes in customer sentiment and support quality.
+## How to use Trustpilot Reviews Scraper
 
-### Competitor Research
-
-Compare public reviews across similar companies. Collect review titles, ratings, and reviewer metadata to identify recurring praise, complaints, and service gaps.
-
-### Customer Experience Analysis
-
-Build datasets for text analysis, dashboards, and reporting. Filter by star rating or language to study specific customer segments.
-
-### Response Tracking
-
-Review public company replies alongside the original customer feedback. This helps teams measure response coverage and tone over time.
-
----
+1. Open the actor on Apify Store.
+2. Add one or more Trustpilot review URLs or plain company domains (for example, `apify.com`).
+3. Set the maximum number of reviews and optional filters.
+4. Choose a sort order and language filter if needed.
+5. Run the actor.
+6. Download the dataset or connect it to your workflow.
 
 ## Input Parameters
 
@@ -46,11 +47,7 @@ Review public company replies alongside the original customer feedback. This hel
 | `verified` | Boolean | No | `false` | Return only verified reviews when enabled. |
 | `proxyConfiguration` | Object | No | Residential proxy | Proxy settings for reliable extraction. |
 
----
-
 ## Output Data
-
-Each saved review may contain:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -62,22 +59,30 @@ Each saved review may contain:
 | `business_name` | String | Trustpilot business display name. |
 | `business_trust_score` | Number | Business TrustScore when available. |
 | `business_review_count` | Integer | Total business review count when available. |
+| `business_website` | String | Company website URL when available. |
+| `business_is_claimed` | Boolean | Whether the business is claimed on Trustpilot. |
 | `title` | String | Review title. |
 | `text` | String | Full review text. |
 | `rating` | Integer | Star rating from 1 to 5. |
 | `language` | String | Review language code. |
+| `review_source` | String | Review source type when available. |
 | `is_verified` | Boolean | Whether Trustpilot marks the review as verified. |
 | `verification_source` | String | Verification label or source when available. |
+| `verification_level` | String | Verification level when available. |
+| `is_pending` | Boolean | Whether the review is pending. |
+| `is_filtered` | Boolean | Whether the review is filtered. |
+| `likes_count` | Integer | Public likes count when available. |
 | `published_date` | String | Date when the review was published. |
 | `experience_date` | String | Date of the customer experience. |
-| `likes_count` | Integer | Public likes count when available. |
+| `reviewer_id` | String | Trustpilot reviewer identifier. |
 | `reviewer_name` | String | Public reviewer display name. |
 | `reviewer_country` | String | Reviewer country code when available. |
 | `reviewer_review_count` | Integer | Public review count for the reviewer. |
+| `reviewer_is_verified` | Boolean | Whether the reviewer is verified. |
+| `consumers_review_count_on_same_domain` | Integer | Reviewer's total reviews on the same business domain. |
 | `company_reply_text` | String | Public company reply text when available. |
 | `company_reply_date` | String | Date of the company reply when available. |
-
----
+| `company_reply_respondent_name` | String | Name of the person who replied for the company. |
 
 ## Usage Examples
 
@@ -119,13 +124,25 @@ Collect recent one-star reviews for support analysis:
 }
 ```
 
----
+### Verified Reviews Only
+
+Collect only verified reviews with company replies:
+
+```json
+{
+  "urls": ["https://www.trustpilot.com/review/example.com"],
+  "verified": true,
+  "results_wanted": 30,
+  "max_pages": 3
+}
+```
 
 ## Sample Output
 
 ```json
 {
-  "review_id": "example-review-id",
+  "review_id": "abc123def456",
+  "review_url": "https://www.trustpilot.com/review/apify.com?page=1",
   "source_url": "https://www.trustpilot.com/review/apify.com?page=1&sort=recency&languages=all",
   "source_page": 1,
   "business_domain": "apify.com",
@@ -140,101 +157,76 @@ Collect recent one-star reviews for support analysis:
   "published_date": "2026-04-08T10:20:00.000Z",
   "experience_date": "2026-04-07T00:00:00.000Z",
   "reviewer_name": "Example Reviewer",
-  "reviewer_country": "US"
+  "reviewer_country": "US",
+  "likes_count": 3
 }
 ```
-
----
 
 ## Tips for Best Results
 
-### Use Company Review Pages
-
-- Prefer URLs in the format `https://www.trustpilot.com/review/company.com`.
-- Plain domains are accepted and converted automatically.
-- Localized Trustpilot URLs are normalized to the main review URL.
-
-### Keep Test Runs Small
-
-- Start with `results_wanted` set to 20.
-- Increase `max_pages` for larger collection jobs.
-- Use star filters when you need targeted sentiment slices.
-
-### Configure Proxies
-
-For larger or scheduled runs, residential proxies are recommended:
-
-```json
-{
-  "proxyConfiguration": {
-    "useApifyProxy": true,
-    "apifyProxyGroups": ["RESIDENTIAL"]
-  }
-}
-```
-
----
+- Use complete public Trustpilot review URLs in the format `https://www.trustpilot.com/review/company.com`. Plain domains are accepted and converted automatically.
+- Start with `results_wanted` set to 20 for test runs. Increase for larger collection jobs.
+- Use star filters when you need targeted sentiment slices such as only 1-star reviews.
+- For larger or scheduled runs, residential proxies improve reliability. Configure proxy settings in the input.
+- Some fields may be empty when the source page does not publish that information. Check multiple results before assuming the actor failed.
+- Public Trustpilot pages can change over time. Report any issues through the Issues tab.
 
 ## Integrations
 
-Connect your Trustpilot review data with:
-
-- **Google Sheets** - Review and label customer feedback.
-- **Airtable** - Build searchable research databases.
-- **Slack** - Send alerts for new low-rating reviews.
-- **Webhooks** - Deliver records to your own systems.
-- **Make** - Create automated monitoring workflows.
-- **Zapier** - Trigger follow-up actions.
-
-### Export Formats
-
-- **JSON** - For developers and data pipelines.
-- **CSV** - For spreadsheet analysis.
-- **Excel** - For reporting and sharing.
-- **XML** - For system integrations.
-
----
+- **Google Sheets** - Send scraped reviews to spreadsheets for analysis and sharing.
+- **Webhooks** - Trigger downstream workflows after each run.
+- **Make or Zapier** - Connect results to no-code automations.
+- **API** - Access datasets programmatically from your own systems.
+- **Export formats** - Download datasets as JSON, CSV, Excel, XML, and other supported formats.
 
 ## Frequently Asked Questions
 
-### Can I scrape any Trustpilot company page?
+### Can I collect reviews from any Trustpilot company page?
 
-Yes, you can provide public Trustpilot company review pages or plain company domains.
+Yes. Provide public Trustpilot review URLs or plain company domains. The actor normalizes them and collects reviews from the public review page.
 
-### Can I collect more than one company in a run?
+### Can I scrape more than one company in a single run?
 
-Yes, add multiple values to `urls` and the actor will process them in order until it reaches `results_wanted`.
+Yes. Add multiple URLs or domains to the `urls` parameter. The actor processes them in order until it reaches the `results_wanted` limit.
 
 ### Can I filter by star rating?
 
-Yes, set `stars` to a value from 1 to 5 to collect only that rating level.
+Yes. Set `stars` to a value from 1 to 5 to collect only that rating level. This is useful for focused sentiment analysis or support case review.
+
+### Can I export the data to CSV or Excel?
+
+Yes. Apify datasets can be downloaded in CSV, Excel, JSON, XML, and other supported formats from the Apify Console.
+
+### Can I run this actor on a schedule?
+
+Yes. You can schedule the actor in Apify Console to refresh data hourly, daily, weekly, or at another interval.
 
 ### Why should I use a proxy?
 
-Trustpilot may limit some traffic sources, so residential proxies improve reliability for production runs.
+Trustpilot may limit traffic from some sources. Residential proxies improve reliability for production runs with larger page counts.
 
-### Are empty fields saved?
+### Does the output include company replies?
 
-No, unavailable null or empty values are removed from each dataset item.
+Yes. When Trustpilot provides a public company reply, the output includes the reply text, date, and respondent name.
 
-### Does this include company replies?
+### What should I do if some fields are missing?
 
-Yes, public company reply text and reply dates are included when Trustpilot provides them.
+Some fields may be empty when the source page does not publish that information. Check multiple results before assuming the actor failed. If a field is consistently missing, open an issue with the target URL.
 
----
+### Is it legal to scrape Trustpilot reviews?
+
+Scraping public web data can be legal, but you are responsible for complying with applicable laws, Trustpilot terms, and privacy rules.
+
+## Related Actors
+
+- [Flipkart Reviews Scraper](https://apify.com/shahidirfan/flipkart-reviews-scraper)
+- [App Store Reviews Scraper](https://apify.com/shahidirfan/app-store-reviews-scraper)
+- [AliExpress Scraper](https://apify.com/shahidirfan/aliexpress-scraper)
 
 ## Support
 
-For issues or feature requests, contact support through the Apify Console.
-
-### Resources
-
-- [Apify Documentation](https://docs.apify.com/)
-- [API Reference](https://docs.apify.com/api/v2)
-- [Scheduling Runs](https://docs.apify.com/schedules)
-
----
+For issues, feature requests, or custom actor work, use the Issues tab on the actor page or contact the developer through Apify.
 
 ## Legal Notice
 
-This actor is designed for legitimate data collection from public pages. Users are responsible for ensuring compliance with Trustpilot terms, privacy rules, and applicable laws. Use collected data responsibly and respect rate limits.
+This actor is designed for legitimate data collection from publicly available Trustpilot pages. Users are responsible for using the data responsibly and complying with applicable laws, Trustpilot terms, and privacy rules.
