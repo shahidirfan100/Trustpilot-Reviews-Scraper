@@ -1,139 +1,90 @@
-/* eslint-disable no-console, import-x/no-extraneous-dependencies */
+/* eslint-disable no-console */
 
-import { gotScraping } from 'got-scraping';
+// Verification harness for the hybrid Trustpilot flow.
+//
+// Run: node discover.mjs [domain]
+//
+// It proves that the browser-solved `aws-waf-token` authorizes impit requests for
+// both supported impit profiles (chrome and firefox), and that a request without
+// the token is blocked. See API_DISCOVERY.md for the full flow.
 
-const UA_IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
-const UA_ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36';
-const UA_DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-const UA_OKHTTP = 'okhttp/4.12.0';
-const UA_IPHONE_APP = 'Trustpilot/11.6.0 (iPhone; iOS 18.5; Scale/3.00)';
+import { Impit } from 'impit';
+import { firefox } from 'playwright';
 
-const profiles = [
-  {
-    name: 'ios-safari-page',
-    http2: false,
-    headers: {
-      'user-agent': UA_IOS,
-      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'accept-language': 'en-US,en;q=0.9',
-      'sec-fetch-site': 'none',
-      'sec-fetch-mode': 'navigate',
-      'sec-fetch-user': '?1',
-      'sec-fetch-dest': 'document',
-    },
-  },
-  {
-    name: 'ios-safari-api',
-    http2: false,
-    headers: {
-      'user-agent': UA_IOS,
-      accept: 'application/json',
-      'accept-language': 'en-US,en;q=0.9',
-      'x-requested-with': 'XMLHttpRequest',
-      referer: 'https://www.trustpilot.com/',
-    },
-  },
-  {
-    name: 'android-app-api',
-    http2: false,
-    headers: {
-      'user-agent': UA_OKHTTP,
-      accept: 'application/json',
-      'accept-language': 'en-US',
-      'x-requested-with': 'com.trustpilot.trustpilot',
-    },
-  },
-  {
-    name: 'iphone-app-api',
-    http2: false,
-    headers: {
-      'user-agent': UA_IPHONE_APP,
-      accept: 'application/json',
-      'accept-language': 'en-US',
-      'x-requested-with': 'com.trustpilot.iphoneapp',
-    },
-  },
-  {
-    name: 'desktop-chrome-page',
-    http2: false,
-    headers: {
-      'user-agent': UA_DESKTOP,
-      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'accept-language': 'en-US,en;q=0.9',
-      'sec-ch-ua': '"Google Chrome";v="124", "Chromium";v="124"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"Windows"',
-      'sec-fetch-site': 'none',
-      'sec-fetch-mode': 'navigate',
-      'sec-fetch-user': '?1',
-      'sec-fetch-dest': 'document',
-    },
-  },
-  {
-    name: 'android-chrome-page',
-    http2: false,
-    headers: {
-      'user-agent': UA_ANDROID,
-      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'accept-language': 'en-US,en;q=0.9',
-      'sec-ch-ua': '"Google Chrome";v="124", "Chromium";v="124"',
-      'sec-ch-ua-mobile': '?1',
-      'sec-ch-ua-platform': '"Android"',
-      'sec-fetch-site': 'none',
-      'sec-fetch-mode': 'navigate',
-      'sec-fetch-user': '?1',
-      'sec-fetch-dest': 'document',
-    },
-  },
-];
+const DOMAIN = process.argv[2] || 'apify.com';
+const BASE_URL = 'https://www.trustpilot.com';
+const NEXT_DATA_RE = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/;
 
-const endpoints = [
-  { label: 'review-page', url: 'https://www.trustpilot.com/review/apify.com' },
-  { label: 'business-units', url: 'https://www.trustpilot.com/api/v1/business-units/apify.com' },
-  { label: 'reviews', url: 'https://www.trustpilot.com/api/v1/business-units/apify.com/reviews?page=1&perPage=20&sort=recency' },
-  { label: 'next-data-latest', url: 'https://www.trustpilot.com/_next/data/latest/review/apify.com.json?page=1' },
-  { label: 'mobile-api-v2', url: 'https://mobile-api.trustpilot.com/v1/business-units/apify.com' },
-  { label: 'consumer-api-v2', url: 'https://consumer-api.trustpilot.com/v1/business-units/apify.com' },
-  { label: 'api-v2', url: 'https://api.trustpilot.com/v1/business-units/apify.com' },
-  { label: 'graphql', url: 'https://www.trustpilot.com/graphql' },
-];
-
-async function tryProfile(profile, label, url) {
-  try {
-    const r = await gotScraping.get(url, {
-      ...profile,
-      throwHttpErrors: false,
-      useHeaderGenerator: false,
-      timeout: { request: 30000 },
-    });
-    const ct = r.headers['content-type'] || '';
-    const isJson = ct.includes('json');
-    let marker = '';
-    if (isJson) {
-      try {
-        const d = JSON.parse(r.body);
-        marker = `keys=${  Object.keys(d).slice(0, 10).join(',')  } len=${  r.body.length}`;
-      } catch {
-        marker = `JSONPARSEFAIL len=${  r.body.length}`;
-      }
-    } else {
-      const blocked = /verify|access denied|captcha|robot|challenge/i.test(r.body) ? 'BLOCKED' : 'OK';
-      marker = `len=${r.body.length} ${blocked}`;
-    }
-    console.log(`[${profile.name}/${label}] ${r.statusCode} ct=${ct} | ${marker}`);
-    return { profile: profile.name, label, status: r.statusCode, isJson, body: r.body };
-  } catch (e) {
-    console.log(`[${profile.name}/${label}] ERR ${e.message}`);
-    return { profile: profile.name, label, err: e.message };
-  }
+function pageUrl(domain, query = {}) {
+    const url = new URL(`${BASE_URL}/review/${domain}`);
+    if (query.page && query.page > 1) url.searchParams.set('page', String(query.page));
+    url.searchParams.set('languages', query.languages || 'all');
+    if (query.sort) url.searchParams.set('sort', query.sort);
+    if (query.stars) url.searchParams.set('stars', String(query.stars));
+    return url.href;
 }
 
-async function run() {
-  for (const endpoint of endpoints) {
-    for (const profile of profiles) {
-      await tryProfile(profile, endpoint.label, endpoint.url);
-    }
-  }
+async function solveWafToken(domain) {
+    const browser = await firefox.launch({ headless: true });
+    const context = await browser.newContext({ locale: 'en-US' });
+    const page = await context.newPage();
+    await page.goto(pageUrl(domain, { sort: 'recency' }), { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForSelector('#__NEXT_DATA__', { state: 'attached', timeout: 60000 });
+    const cookies = await context.cookies();
+    await browser.close();
+    return cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
 }
 
-await run();
+function reviewCount(html) {
+    const match = html.match(NEXT_DATA_RE);
+    if (!match) return null;
+    try {
+        const payload = JSON.parse(match[1]);
+        const reviews = payload?.props?.pageProps?.reviews;
+        return Array.isArray(reviews) ? reviews.length : null;
+    } catch {
+        return null;
+    }
+}
+
+async function probe(profile, url, cookie) {
+    const client = new Impit({ browser: profile });
+    const headers = cookie ? { Cookie: cookie, Accept: 'text/html,application/xhtml+xml' } : { Accept: 'text/html' };
+    try {
+        const response = await client.fetch(url, { headers, redirect: 'follow' });
+        const html = await response.text();
+        const count = reviewCount(html);
+        const verdict = count === null ? 'BLOCKED (no __NEXT_DATA__)' : `OK reviews=${count}`;
+        console.log(`[${profile}] ${response.status} ${verdict}`);
+        return count !== null;
+    } catch (error) {
+        console.log(`[${profile}] ERROR ${error.message}`);
+        return false;
+    }
+}
+
+async function main() {
+    console.log(`Domain: ${DOMAIN}`);
+    const cookie = await solveWafToken(DOMAIN);
+    console.log(`Token cookie: ${cookie.split('=')[0]}`);
+
+    const page2 = pageUrl(DOMAIN, { page: 2, sort: 'recency' });
+    const stars1 = pageUrl(DOMAIN, { sort: 'recency', stars: 1 });
+
+    console.log('\n-- control: no token (expected 403) --');
+    await probe('chrome', page2, '');
+
+    console.log('\n-- with token --');
+    const results = [];
+    for (const profile of ['chrome', 'firefox']) {
+        results.push([profile, 'page2', await probe(profile, page2, cookie)]);
+        results.push([profile, 'stars=1', await probe(profile, stars1, cookie)]);
+    }
+
+    const working = results.filter(([, , ok]) => ok).map(([profile]) => profile);
+    console.log(
+        `\nResult: ${working.length ? `working profiles -> ${[...new Set(working)].join(', ')}` : 'no working profile'}`,
+    );
+}
+
+await main();

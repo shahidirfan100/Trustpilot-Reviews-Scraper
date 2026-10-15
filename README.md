@@ -7,6 +7,7 @@ Trustpilot does not provide a public API for review extraction at scale. This ac
 ## Why use Trustpilot Reviews Scraper?
 
 - **Reliable dataset creation** - Collect structured Trustpilot reviews with titles, ratings, text, dates, reviewer details, and company context without manual copying.
+- **Deep coverage** - Go well past Trustpilot's ~200-review public view limit by combining star, language, and sort views, then merging unique reviews automatically.
 - **Automation-ready output** - Export results to JSON, CSV, Excel, XML, or connect to Google Sheets, webhooks, Make, and Zapier.
 - **Use-case fit** - Supports reputation monitoring, competitor benchmarking, customer experience analysis, response tracking, and AI or RAG data collection.
 
@@ -39,13 +40,13 @@ Trustpilot does not provide a public API for review extraction at scale. This ac
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `urls` | Array | No | `["https://www.trustpilot.com/review/apify.com"]` | Trustpilot company review URLs or plain company domains such as `apify.com`. |
-| `results_wanted` | Integer | No | `20` | Maximum number of reviews to save across all URLs. |
-| `max_pages` | Integer | No | `10` | Maximum review pages to request per company. |
+| `results_wanted` | Integer | No | `20` | Maximum number of reviews to save across all URLs. Values above about 200 are collected automatically across multiple review views. |
+| `max_pages` | Integer | No | `10` | Maximum review pages per filter view. Trustpilot serves at most 10 pages (about 200 reviews) per view. |
 | `sort` | String | No | `"recency"` | Sort order: `recency` or `relevance`. |
 | `languages` | String | No | `"all"` | Use `all` or a language code such as `en`, `de`, `fr`, `es`, or `it`. |
 | `stars` | Integer | No | - | Optional star rating filter from 1 to 5. |
 | `verified` | Boolean | No | `false` | Return only verified reviews when enabled. |
-| `proxyConfiguration` | Object | No | Residential proxy | Proxy settings for reliable extraction. |
+| `proxyConfiguration` | Object | No | No proxy | Proxy settings for reliable extraction. Residential proxies are recommended for larger runs. |
 
 ## Output Data
 
@@ -143,7 +144,7 @@ Collect only verified reviews with company replies:
 {
   "review_id": "abc123def456",
   "review_url": "https://www.trustpilot.com/review/apify.com?page=1",
-  "source_url": "https://www.trustpilot.com/review/apify.com?page=1&sort=recency&languages=all",
+  "source_url": "https://www.trustpilot.com/review/apify.com?sort=recency&languages=all",
   "source_page": 1,
   "business_domain": "apify.com",
   "business_name": "Apify",
@@ -166,6 +167,7 @@ Collect only verified reviews with company replies:
 
 - Use complete public Trustpilot review URLs in the format `https://www.trustpilot.com/review/company.com`. Plain domains are accepted and converted automatically.
 - Start with `results_wanted` set to 20 for test runs. Increase for larger collection jobs.
+- To go past Trustpilot's ~200-review public view limit, raise `results_wanted`.
 - Use star filters when you need targeted sentiment slices such as only 1-star reviews.
 - For larger or scheduled runs, residential proxies improve reliability. Configure proxy settings in the input.
 - Some fields may be empty when the source page does not publish that information. Check multiple results before assuming the actor failed.
@@ -188,6 +190,12 @@ Yes. Provide public Trustpilot review URLs or plain company domains. The actor n
 ### Can I scrape more than one company in a single run?
 
 Yes. Add multiple URLs or domains to the `urls` parameter. The actor processes them in order until it reaches the `results_wanted` limit.
+
+### Can I collect more than 200 reviews from one company?
+
+Yes. Trustpilot's public review pages only expose about 200 reviews per filter view, but
+this actor automatically combines multiple star, language, and sort views and merges
+unique reviews. Just set a higher `results_wanted` value to collect more.
 
 ### Can I filter by star rating?
 

@@ -11,5 +11,8 @@ storage
 # installed files
 node_modules
 
+# lockfile is generated with a different npm than the base image; let the image resolve
+package-lock.json
+
 # git folder
 .git

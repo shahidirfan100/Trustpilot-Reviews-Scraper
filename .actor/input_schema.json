@@ -12,6 +12,9 @@
       "items": {
         "type": "string"
       },
+      "default": [
+        "https://www.trustpilot.com/review/apify.com"
+      ],
       "prefill": [
         "https://www.trustpilot.com/review/apify.com"
       ]
@@ -19,19 +22,17 @@
     "results_wanted": {
       "title": "Reviews wanted",
       "type": "integer",
-      "description": "Maximum number of reviews to save across all URLs.",
+      "description": "Maximum number of reviews to save across all URLs. Values above about 200 are collected automatically across multiple review views.",
       "minimum": 1,
       "default": 20,
-      "prefill": 20,
       "editor": "number"
     },
     "max_pages": {
-      "title": "Maximum pages",
+      "title": "Maximum pages per filter",
       "type": "integer",
-      "description": "Maximum review pages to request per company.",
+      "description": "Maximum review pages to request per filter view. Trustpilot serves at most 10 anonymous pages (about 200 reviews) per filter view.",
       "minimum": 1,
       "default": 10,
-      "prefill": 2,
       "editor": "number"
     },
     "sort": {
@@ -39,7 +40,6 @@
       "type": "string",
       "description": "Trustpilot review sort order.",
       "default": "recency",
-      "prefill": "recency",
       "editor": "select",
       "enum": [
         "recency",
@@ -55,7 +55,6 @@
       "type": "string",
       "description": "Use all languages or a Trustpilot language code such as en, de, fr, es, or it.",
       "default": "all",
-      "prefill": "all",
       "editor": "textfield"
     },
     "stars": {
@@ -76,11 +75,9 @@
     "proxyConfiguration": {
       "title": "Proxy configuration",
       "type": "object",
-      "description": "Use Apify Proxy for reliable Trustpilot extraction. Residential proxies are recommended for larger runs.",
+      "description": "Uses no proxy by default. Choose Apify Proxy or provide custom proxy URLs for reliable extraction at scale.",
       "editor": "proxy",
-      "default": {
-        "useApifyProxy": false
-      }  
+      "default": {}
     }
   },
   "required": [],
